@@ -1045,6 +1045,60 @@ class ATSTailor {
   }
 
   /**
+   * Perform AI keyword extraction - reusable helper for tailorDocuments
+   * Same logic as aiExtractKeywords but returns the result instead of updating UI
+   * @returns {Promise<Object>} Keywords object with all, highPriority, mediumPriority, lowPriority
+   */
+  async performAIKeywordExtraction() {
+    // Ensure we have job info
+    if (!this.currentJob?.description) {
+      await this.detectCurrentJob();
+    }
+    
+    if (!this.currentJob?.description) {
+      throw new Error('No job description detected');
+    }
+    
+    // Call the AI extraction edge function
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/extract-keywords-ai`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.session.access_token}`,
+        apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        jobDescription: this.currentJob.description,
+        jobTitle: this.currentJob.title || '',
+        company: this.currentJob.company || '',
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'AI extraction failed');
+    }
+    
+    const result = await response.json();
+    
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    
+    // Build keywords object
+    const keywords = {
+      all: result.all || [],
+      highPriority: result.highPriority || [],
+      mediumPriority: result.mediumPriority || [],
+      lowPriority: result.lowPriority || [],
+      structured: result.structured, // Full Resume-Matcher style breakdown
+    };
+    
+    console.log('[ATS Tailor] AI extracted', keywords.all.length, 'keywords');
+    return keywords;
+  }
+
+  /**
    * OPTIMIZED: Fast single-pass keyword extraction fallback
    */
   fastKeywordExtraction(text) {
@@ -1166,12 +1220,12 @@ class ATSTailor {
   }
 
   /**
-   * GUARANTEED 100% MATCH: Aggressive keyword injection into CV
-   * Strategy:
-   * 1. Summary: 8 keywords (natural sentences)
-   * 2. Experience: 2-3 keywords per bullet in top 3 roles
-   * 3. Skills: 15+ keywords grouped by category
-   * 4. Catch-all: Remaining keywords as "Additional Proficiencies"
+   * GUARANTEED 100% MATCH: Natural keyword injection into CV
+   * Strategy (prioritizes Work Experience for natural integration):
+   * 1. Experience: Primary focus - 25+ keywords naturally integrated into bullet points
+   * 2. Summary: 5-8 keywords as expertise phrases
+   * 3. Skills: Remaining keywords grouped by category
+   * 4. Catch-all: Any remaining keywords as Technical Proficiencies
    */
   fastKeywordInjection(cvText, keywords, missingKeywords) {
     if (!missingKeywords || missingKeywords.length === 0) {
@@ -1182,69 +1236,98 @@ class ATSTailor {
     let injectedKeywords = [];
     let remaining = [...missingKeywords];
     
-    // STEP 1: Inject 8 keywords into Summary
-    const summaryMatch = tailoredCV.match(/(PROFESSIONAL SUMMARY|SUMMARY|PROFILE)\s*\n([\s\S]*?)(?=\n[A-Z]{3,}|\n\n|$)/i);
-    if (summaryMatch && remaining.length > 0) {
-      const summaryStart = summaryMatch.index;
-      const summaryEnd = summaryStart + summaryMatch[0].length;
-      const summaryText = summaryMatch[2];
-      
-      const toInject = remaining.slice(0, 8);
-      remaining = remaining.slice(8);
-      
-      // Build natural injection phrases
-      const techKeywords = toInject.filter(k => /^[a-z\-\.]+$/i.test(k));
-      const softKeywords = toInject.filter(k => !/^[a-z\-\.]+$/i.test(k));
-      
-      let injectionPhrase = '';
-      if (techKeywords.length > 0) {
-        injectionPhrase += ` Expert in ${techKeywords.slice(0, 4).join(', ')}.`;
-      }
-      if (softKeywords.length > 0) {
-        injectionPhrase += ` Demonstrated ${softKeywords.slice(0, 4).join(', ')}.`;
-      }
-      if (techKeywords.length > 4) {
-        injectionPhrase += ` Proficient with ${techKeywords.slice(4).join(', ')}.`;
-      }
-      
-      const newSummary = summaryText.trim() + injectionPhrase;
-      tailoredCV = tailoredCV.substring(0, summaryStart) + 
-                   summaryMatch[1] + '\n' + newSummary + 
-                   tailoredCV.substring(summaryEnd);
-      injectedKeywords.push(...toInject);
-    }
+    // Natural injection phrases for Work Experience
+    const actionPhrases = [
+      'leveraging', 'utilizing', 'implementing', 'applying', 'integrating',
+      'incorporating', 'employing', 'deploying', 'using', 'with expertise in'
+    ];
     
-    // STEP 2: Inject into Experience section (20 keywords across bullets)
+    const getRandomPhrase = () => actionPhrases[Math.floor(Math.random() * actionPhrases.length)];
+    
+    // STEP 1: PRIMARY - Inject into Work Experience (25+ keywords naturally across bullets)
     if (remaining.length > 0) {
-      const experienceMatch = tailoredCV.match(/(WORK EXPERIENCE|EXPERIENCE|EMPLOYMENT HISTORY)\s*\n([\s\S]*?)(?=\n(EDUCATION|SKILLS|CERTIFICATIONS|ACHIEVEMENTS)|\n\n\n|$)/i);
+      const experienceMatch = tailoredCV.match(/(WORK EXPERIENCE|EXPERIENCE|EMPLOYMENT HISTORY|PROFESSIONAL EXPERIENCE)\s*\n([\s\S]*?)(?=\n(EDUCATION|SKILLS|TECHNICAL SKILLS|CERTIFICATIONS|ACHIEVEMENTS|PROJECTS)|\n\n\n|$)/i);
       if (experienceMatch) {
         const expStart = experienceMatch.index;
         const expEnd = expStart + experienceMatch[0].length;
         let experienceText = experienceMatch[0];
         
-        // Find bullets and inject keywords
+        // Find all bullet points
         const bullets = experienceText.match(/^[•\-\*]\s*.+$/gm) || [];
-        const toInject = remaining.slice(0, Math.min(20, bullets.length * 2));
-        remaining = remaining.slice(toInject.length);
+        // Target 2-3 keywords per bullet for natural integration
+        const keywordsPerBullet = Math.ceil(remaining.length * 0.7 / Math.max(bullets.length, 1));
+        const maxKeywordsInExp = Math.min(remaining.length, bullets.length * 3);
+        const toInject = remaining.slice(0, maxKeywordsInExp);
+        remaining = remaining.slice(maxKeywordsInExp);
         
         let keywordIdx = 0;
         bullets.forEach((bullet, idx) => {
-          if (keywordIdx < toInject.length && idx < 10) {
-            const kwToAdd = toInject.slice(keywordIdx, keywordIdx + 2);
-            keywordIdx += 2;
-            const enhanced = bullet.replace(/\.$/, '') + `, utilizing ${kwToAdd.join(' and ')}.`;
-            experienceText = experienceText.replace(bullet, enhanced);
+          if (keywordIdx >= toInject.length) return;
+          
+          // Get 1-3 keywords for this bullet
+          const numToAdd = Math.min(3, Math.ceil((toInject.length - keywordIdx) / (bullets.length - idx)));
+          const kwToAdd = toInject.slice(keywordIdx, keywordIdx + numToAdd);
+          keywordIdx += numToAdd;
+          
+          if (kwToAdd.length === 0) return;
+          
+          // Natural integration based on bullet content
+          const phrase = getRandomPhrase();
+          let enhanced = bullet;
+          
+          if (kwToAdd.length === 1) {
+            // Single keyword: "...by utilizing [keyword]"
+            enhanced = bullet.replace(/\.?\s*$/, `, ${phrase} ${kwToAdd[0]}.`);
+          } else if (kwToAdd.length === 2) {
+            // Two keywords: "...through [kw1] and [kw2]"
+            enhanced = bullet.replace(/\.?\s*$/, `, ${phrase} ${kwToAdd[0]} and ${kwToAdd[1]}.`);
+          } else {
+            // Multiple: "...incorporating [kw1], [kw2], and [kw3]"
+            const last = kwToAdd.pop();
+            enhanced = bullet.replace(/\.?\s*$/, `, ${phrase} ${kwToAdd.join(', ')}, and ${last}.`);
+            kwToAdd.push(last); // Put it back for tracking
           }
+          
+          experienceText = experienceText.replace(bullet, enhanced);
+          injectedKeywords.push(...kwToAdd);
         });
         
         tailoredCV = tailoredCV.substring(0, expStart) + experienceText + tailoredCV.substring(expEnd);
+      }
+    }
+    
+    // STEP 2: Inject 5-8 keywords into Summary as expertise
+    if (remaining.length > 0) {
+      const summaryMatch = tailoredCV.match(/(PROFESSIONAL SUMMARY|SUMMARY|PROFILE|CAREER SUMMARY)\s*\n([\s\S]*?)(?=\n[A-Z]{3,}|\n\n|$)/i);
+      if (summaryMatch) {
+        const summaryStart = summaryMatch.index;
+        const summaryEnd = summaryStart + summaryMatch[0].length;
+        const summaryText = summaryMatch[2];
+        
+        const toInject = remaining.slice(0, Math.min(8, remaining.length));
+        remaining = remaining.slice(toInject.length);
+        
+        // Build natural expertise sentence
+        let injectionPhrase = '';
+        if (toInject.length <= 3) {
+          injectionPhrase = ` Expertise includes ${toInject.join(', ')}.`;
+        } else if (toInject.length <= 5) {
+          injectionPhrase = ` Strong background in ${toInject.slice(0, 3).join(', ')}, with additional skills in ${toInject.slice(3).join(' and ')}.`;
+        } else {
+          injectionPhrase = ` Core competencies include ${toInject.slice(0, 4).join(', ')}. Proven proficiency in ${toInject.slice(4).join(', ')}.`;
+        }
+        
+        const newSummary = summaryText.trim() + injectionPhrase;
+        tailoredCV = tailoredCV.substring(0, summaryStart) + 
+                     summaryMatch[1] + '\n' + newSummary + 
+                     tailoredCV.substring(summaryEnd);
         injectedKeywords.push(...toInject);
       }
     }
     
-    // STEP 3: Inject remaining into Skills section (15+ keywords)
+    // STEP 3: Inject remaining into Skills section
     if (remaining.length > 0) {
-      const skillsMatch = tailoredCV.match(/(SKILLS|TECHNICAL SKILLS|CORE COMPETENCIES)\s*\n([\s\S]*?)(?=\n[A-Z]{3,}|\n\n|$)/i);
+      const skillsMatch = tailoredCV.match(/(SKILLS|TECHNICAL SKILLS|CORE COMPETENCIES|KEY SKILLS)\s*\n([\s\S]*?)(?=\n[A-Z]{3,}|\n\n|$)/i);
       if (skillsMatch) {
         const skillsStart = skillsMatch.index;
         const skillsEnd = skillsStart + skillsMatch[0].length;
@@ -1253,7 +1336,7 @@ class ATSTailor {
         const toInject = remaining.slice(0, 15);
         remaining = remaining.slice(15);
         
-        const newSkills = skillsText.trim() + '\nAdditional: ' + toInject.join(', ');
+        const newSkills = skillsText.trim() + '\n• Additional: ' + toInject.join(', ');
         tailoredCV = tailoredCV.substring(0, skillsStart) + 
                      skillsMatch[1] + '\n' + newSkills + 
                      tailoredCV.substring(skillsEnd);
@@ -1261,12 +1344,12 @@ class ATSTailor {
       }
     }
     
-    // STEP 4: CATCH-ALL - Any remaining keywords go into Additional Proficiencies
+    // STEP 4: CATCH-ALL - Any remaining keywords as Technical Proficiencies
     if (remaining.length > 0) {
-      const additionalSection = `\n\nADDITIONAL PROFICIENCIES\n${remaining.join(' | ')}`;
+      const additionalSection = `\n\nTECHNICAL PROFICIENCIES\n• ${remaining.join(' • ')}`;
       
       // Insert before certifications/achievements or append to end
-      const insertPoint = tailoredCV.search(/\n(CERTIFICATIONS|ACHIEVEMENTS|EDUCATION)\n/i);
+      const insertPoint = tailoredCV.search(/\n(CERTIFICATIONS|ACHIEVEMENTS|EDUCATION|PROJECTS)\n/i);
       if (insertPoint > 0) {
         tailoredCV = tailoredCV.substring(0, insertPoint) + additionalSection + tailoredCV.substring(insertPoint);
       } else {
@@ -1280,14 +1363,16 @@ class ATSTailor {
 
   /**
    * OPTIMIZED: Full automatic tailoring pipeline
-   * 1. Extract keywords from JD (with caching)
-   * 2. Generate base CV via backend
-   * 3. Boost CV to 95-100% match (internal, no button)
-   * 4. Generate PDFs & attach CV
+   * IMPLEMENTATION FLOW:
+   * 1. Click "AI Extract Keywords" → Wait for full extraction
+   * 2. Grab 100% match keywords → Integrate naturally into Work Experience bullets
+   * 3. Verify 100% profile match in extension UI
+   * 4. Generate "Tailored_CV_[Job]_[Date].pdf" → Enable preview/download
+   * 5. Auto-attach PDF to application upload field
    * 
    * UI updates at each stage for responsiveness
    */
-  async tailorDocuments() {
+  async tailorDocuments(options = {}) {
     if (!this.currentJob) {
       this.showToast('No job detected', 'error');
       return;
@@ -1327,52 +1412,58 @@ class ATSTailor {
     };
 
     try {
-      // ============ PARALLEL STEP 1: Extract Keywords + Load Profile simultaneously ============
+      // ============ STEP 1: AI EXTRACT KEYWORDS (Click "AI Extract Keywords" first) ============
       updateStep(1, 'working');
-      updateProgress(5, 'Step 1/3: Extracting keywords & loading profile...');
+      updateProgress(5, 'Step 1/3: AI Extracting keywords from job description...');
 
       await this.refreshSessionIfNeeded();
       if (!this.session?.access_token || !this.session?.user?.id) {
         throw new Error('Please sign in again');
       }
 
-      // PARALLEL PROCESSING: Run keyword extraction and profile fetch simultaneously
-      const [keywords, profileRes] = await Promise.all([
-        // Task 1: Extract keywords (fast, cached)
-        Promise.resolve(this.extractKeywordsOptimized(this.currentJob?.description || '')),
-        
-        // Task 2: Fetch user profile (API call)
-        fetch(
-          `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${this.session.user.id}&select=first_name,last_name,email,phone,linkedin,github,portfolio,cover_letter,work_experience,education,skills,certifications,achievements,ats_strategy,city,country,address,state,zip_code`,
-          {
-            headers: {
-              apikey: SUPABASE_ANON_KEY,
-              Authorization: `Bearer ${this.session.access_token}`,
-            },
-          }
-        )
-      ]);
+      // FIRST: Call AI Extract Keywords (equivalent to clicking the AI Extract button)
+      let keywords = null;
+      try {
+        keywords = await this.performAIKeywordExtraction();
+        console.log('[ATS Tailor] Step 1 - AI Extracted keywords:', keywords?.all?.length || 0);
+      } catch (aiError) {
+        console.warn('[ATS Tailor] AI extraction failed, falling back to local extraction:', aiError);
+        // Fallback to local extraction if AI fails
+        keywords = this.extractKeywordsOptimized(this.currentJob?.description || '');
+      }
+      
+      if (!keywords || !keywords.all || keywords.all.length === 0) {
+        throw new Error('Could not extract keywords from job description');
+      }
       
       // Store keywords immediately for UI
       this.generatedDocuments.keywords = keywords;
       
       // UPDATE UI: Show extracted keywords immediately (before boost)
-      if (keywords.all.length > 0) {
-        this.generatedDocuments.matchedKeywords = [];
-        this.generatedDocuments.missingKeywords = keywords.all;
-        this.generatedDocuments.matchScore = 0;
-        this.updateMatchAnalysisUI(); // Show all keywords as "missing" initially
-      }
+      this.generatedDocuments.matchedKeywords = [];
+      this.generatedDocuments.missingKeywords = keywords.all;
+      this.generatedDocuments.matchScore = 0;
+      this.updateMatchAnalysisUI();
       
       // Save keywords to history for comparison feature
       await this.saveKeywordsToHistory(keywords);
 
-      console.log('[ATS Tailor] Step 1 - Extracted keywords:', keywords.all?.length || 0);
       updateStep(1, 'complete');
 
-      // ============ STEP 2: Generate Base CV & Cover Letter ============
+      // ============ STEP 2: Load Profile & Generate Base CV ============
       updateStep(2, 'working');
-      updateProgress(20, 'Step 2/3: Generating tailored CV & Cover Letter...');
+      updateProgress(20, 'Step 2/3: Loading profile & generating tailored CV...');
+
+      // Fetch user profile (API call)
+      const profileRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${this.session.user.id}&select=first_name,last_name,email,phone,linkedin,github,portfolio,cover_letter,work_experience,education,skills,certifications,achievements,ats_strategy,city,country,address,state,zip_code`,
+        {
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${this.session.access_token}`,
+          },
+        }
+      );
 
       if (!profileRes.ok) {
         throw new Error('Could not load profile. Open the QuantumHire app and complete your profile.');
@@ -1380,7 +1471,10 @@ class ATSTailor {
 
       const profileRows = await profileRes.json();
       const p = profileRows?.[0] || {};
+      
+      console.log('[ATS Tailor] Step 2 - Profile loaded, generating base CV...');
 
+      // Update step text
       updateProgress(35, 'Step 2/3: AI generating tailored documents...');
 
       const response = await fetch(`${SUPABASE_URL}/functions/v1/tailor-application`, {
@@ -1428,10 +1522,12 @@ class ATSTailor {
       const result = await response.json();
       if (result.error) throw new Error(result.error);
 
-      // Filename format: [FirstName]_[LastName]_CV.pdf
+      // Filename format: Tailored_CV_[Job]_[Date].pdf
+      const jobTitle = (this.currentJob?.title || 'Position').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+      const dateStr = new Date().toISOString().split('T')[0];
       const firstName = (p.first_name || '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
       const lastName = (p.last_name || '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-      const fallbackName = (firstName && lastName) ? `${firstName}_${lastName}` : 'Applicant';
+      const candidateName = (firstName && lastName) ? `${firstName}_${lastName}` : 'Applicant';
       
       this.profileInfo = { firstName: p.first_name, lastName: p.last_name };
 
@@ -1440,8 +1536,8 @@ class ATSTailor {
         coverLetter: result.tailoredCoverLetter || result.coverLetter,
         cvPdf: result.resumePdf,
         coverPdf: result.coverLetterPdf,
-        cvFileName: `${fallbackName}_CV.pdf`,
-        coverFileName: `${fallbackName}_Cover_Letter.pdf`,
+        cvFileName: `Tailored_CV_${jobTitle}_${dateStr}.pdf`,
+        coverFileName: `${candidateName}_Cover_Letter_${jobTitle}.pdf`,
         matchScore: result.matchScore || 0,
         matchedKeywords: result.keywordsMatched || result.matchedKeywords || [],
         missingKeywords: result.keywordsMissing || result.missingKeywords || [],

@@ -254,13 +254,10 @@
         yPos += 10; // Section spacing
       }
 
-      // Generate filename
-      const jobTitle = (jobData?.title || 'Position').replace(/[^a-zA-Z0-9]/g, '_');
-      const locationClean = tailoredLocation.replace(/[^a-zA-Z0-9]/g, '_');
+      // Generate filename: Tailored_CV_[Job]_[Date].pdf
+      const jobTitle = (jobData?.title || 'Position').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
       const date = new Date().toISOString().split('T')[0];
-      const firstName = candidateData.firstName || candidateData.first_name || 'Max';
-      const lastName = candidateData.lastName || candidateData.last_name || 'Okafor';
-      const fileName = `${firstName}_${lastName}_${jobTitle}_${locationClean}_${date}.pdf`;
+      const fileName = `Tailored_CV_${jobTitle}_${date}.pdf`;
 
       // Get PDF as base64
       const pdfBase64 = doc.output('datauristring').split(',')[1];
@@ -299,13 +296,10 @@
         fullText += '\n';
       }
 
-      // Generate filename
-      const jobTitle = (jobData?.title || 'Position').replace(/[^a-zA-Z0-9]/g, '_');
-      const locationClean = tailoredLocation.replace(/[^a-zA-Z0-9]/g, '_');
+      // Generate filename: Tailored_CV_[Job]_[Date].pdf
+      const jobTitle = (jobData?.title || 'Position').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
       const date = new Date().toISOString().split('T')[0];
-      const firstName = candidateData.firstName || candidateData.first_name || 'Max';
-      const lastName = candidateData.lastName || candidateData.last_name || 'Okafor';
-      const fileName = `${firstName}_${lastName}_${jobTitle}_${locationClean}_${date}.pdf`;
+      const fileName = `Tailored_CV_${jobTitle}_${date}.pdf`;
 
       return {
         text: fullText,
