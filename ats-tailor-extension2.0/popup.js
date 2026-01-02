@@ -1522,9 +1522,7 @@ class ATSTailor {
       const result = await response.json();
       if (result.error) throw new Error(result.error);
 
-      // Filename format: Tailored_CV_[Job]_[Date].pdf
-      const jobTitle = (this.currentJob?.title || 'Position').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
-      const dateStr = new Date().toISOString().split('T')[0];
+      // Filename format: {FirstName}_{LastName}_CV.pdf
       const firstName = (p.first_name || '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
       const lastName = (p.last_name || '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
       const candidateName = (firstName && lastName) ? `${firstName}_${lastName}` : 'Applicant';
@@ -1536,8 +1534,8 @@ class ATSTailor {
         coverLetter: result.tailoredCoverLetter || result.coverLetter,
         cvPdf: result.resumePdf,
         coverPdf: result.coverLetterPdf,
-        cvFileName: `Tailored_CV_${jobTitle}_${dateStr}.pdf`,
-        coverFileName: `${candidateName}_Cover_Letter_${jobTitle}.pdf`,
+        cvFileName: `${candidateName}_CV.pdf`,
+        coverFileName: `${candidateName}_Cover_Letter.pdf`,
         matchScore: result.matchScore || 0,
         matchedKeywords: result.keywordsMatched || result.matchedKeywords || [],
         missingKeywords: result.keywordsMissing || result.missingKeywords || [],
