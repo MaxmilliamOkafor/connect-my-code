@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ATS Tailored CV & Cover Letter</title>
+  <title>CV Tailor Pro - ATS-Optimized Resume Builder</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
     <header class="header">
       <div class="logo">
-        <img src="icons/icon48.png" alt="ATS Tailor" class="logo-icon">
+        <img src="icons/icon48.png" alt="CV Tailor Pro" class="logo-icon">
         <div class="logo-text">
-          <h1>ATS Tailor</h1>
-          <span class="tagline">Lightning-fast CV & Cover Letter</span>
+          <h1>CV Tailor Pro</h1>
+          <span class="tagline">ATS-Optimized Resume Builder</span>
         </div>
       </div>
       <div class="status-indicator" id="statusIndicator">
@@ -45,6 +45,21 @@
       <div class="user-bar">
         <span id="userEmail" class="user-email"></span>
         <button id="logoutBtn" class="btn-link">Logout</button>
+      </div>
+
+      <!-- CV Import/Upload Section (NEW - OpenResume Style) -->
+      <div class="cv-import-card" id="cvImportCard">
+        <div class="cv-import-header">
+          <span class="cv-import-icon">📄</span>
+          <span class="cv-import-title">Your CV</span>
+          <button id="uploadCVBtn" class="btn btn-small btn-outline" title="Upload or edit CV">
+            <span>📤</span> Import
+          </button>
+        </div>
+        <div class="cv-import-status" id="cvImportStatus">
+          <span class="status-text">No CV uploaded yet</span>
+        </div>
+        <p class="cv-import-hint">Import your CV (PDF/DOCX) or enter manually. Your data stays local.</p>
       </div>
 
       <!-- Settings -->
@@ -387,7 +402,7 @@
     </section>
 
     <footer class="footer">
-      <span class="version">v2.1.0</span>
+      <span class="version">v2.0.0 - CV Tailor Pro</span>
     </footer>
   </div>
 
@@ -398,7 +413,12 @@
   <script src="tailor-universal.js"></script>
   <script src="validation-engine.js"></script>
   
-  <!-- Resume Builder (new) -->
+  <!-- CV Tailor Pro modules (NEW) -->
+  <script src="cv-tailor-pro.js"></script>
+  <script src="pdf-preview-modal.js"></script>
+  <script src="cv-upload-panel.js"></script>
+  
+  <!-- Resume Builder -->
   <script src="resume-builder.js"></script>
   
   <!-- Turbo Pipeline -->
