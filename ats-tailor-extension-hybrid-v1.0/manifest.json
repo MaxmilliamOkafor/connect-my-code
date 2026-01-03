@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "ATS Tailor HYBRID v1.3 - LazyApply 3X INSTANT (175ms) + Resume Builder",
-  "version": "1.3.0",
-  "description": "HYBRID v1.3: LazyApply 3X INSTANT speed (≤175ms) + Resume Builder with text preview + Unique CV per job + ALL extracted keywords. ATS-perfect PDF: Arial 10.5pt, 0.75\" margins. Supports Greenhouse, Workday, SmartRecruiters, Bullhorn, Teamtailor, Workable, ICIMS, Oracle Cloud.",
+  "name": "CV Tailor Pro - ATS-Optimized Resume Builder",
+  "version": "2.0.0",
+  "description": "CV Tailor Pro v2.0: OpenResume-style ATS-optimized CV tailoring with PDF preview. Import ANY CV, extract JD keywords, tailor to 100% match, preview & download perfect PDF. Supports Greenhouse, Workday, SmartRecruiters, Bullhorn, Teamtailor, Workable, ICIMS, Oracle Cloud.",
   "permissions": [
     "storage",
     "activeTab",
@@ -60,6 +60,9 @@
         "turbo-pipeline.js",
         "pdf-ats-turbo.js",
         "file-attacher-turbo.js",
+        "cv-tailor-pro.js",
+        "pdf-preview-modal.js",
+        "cv-upload-panel.js",
         "resume-builder.js",
         "content.js"
       ],
@@ -94,6 +97,9 @@
         "turbo-pipeline.js",
         "pdf-ats-turbo.js",
         "file-attacher-turbo.js",
+        "cv-tailor-pro.js",
+        "pdf-preview-modal.js",
+        "cv-upload-panel.js",
         "resume-builder.js"
       ],
       "matches": ["<all_urls>"]

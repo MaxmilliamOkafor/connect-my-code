@@ -1,8 +1,7 @@
-// content.js - HYBRID v1.3.0 - LazyApply 3X INSTANT Speed (≤175ms) + ALL 5.0 Features
-// MERGE: 4.0's proven file attach logic + 5.0's keyword extraction, tailoring, PDF generation
-// SPEED: INSTANT 175ms pipeline - 0ms detect → 25ms banner → 50ms AUTO-CLICK → 175ms complete
-// UNIQUE CV: Preserves user's companies/roles/dates, modifies only bullet phrasing per job
-// FIXED: Instant button trigger, removed localStorage resume-on-return
+// content.js - CV Tailor Pro v2.0 - Enterprise ATS-Optimized CV Tailoring
+// Features: OpenResume-style CV import, JD keyword extraction, 100% match tailoring, PDF preview
+// Speed: INSTANT 175ms pipeline - 0ms detect → 25ms banner → 50ms AUTO-CLICK → 175ms complete
+// Supports: Greenhouse, Workday, SmartRecruiters, Bullhorn, Teamtailor, Workable, ICIMS, Oracle Cloud
 
 (function() {
   'use strict';
@@ -11,15 +10,15 @@
   const LAZYAPPLY_TIMING = {
     ATS_DETECT: 0,           // 0ms: Instant platform detection
     BANNER_SHOW: 25,         // 25ms: Banner appears
-    BUTTON_CLICK: 50,        // 50ms: AUTO-CLICK "Extract & Apply" button
+    BUTTON_CLICK: 50,        // 50ms: AUTO-CLICK "Tailor CV Now" button
     LOADING_STATE: 75,       // 75ms: Button shows loading state
     EXTRACT_COMPLETE: 125,   // 125ms: Keyword extraction done
     PIPELINE_COMPLETE: 175   // 175ms: Full pipeline (PDF + attach) complete
   };
 
   const pipelineStart = performance.now();
-  console.log(`[ATS Tailor] HYBRID v1.3.0 LAZYAPPLY 3X INSTANT (175ms) loaded at ${pipelineStart.toFixed(0)}ms`);
-  console.log('[ATS Tailor] Features: INSTANT 50ms button click + 175ms pipeline + Unique CV');
+  console.log(`[CV Tailor Pro] v2.0 Enterprise loaded at ${pipelineStart.toFixed(0)}ms`);
+  console.log('[CV Tailor Pro] Features: OpenResume-style tailoring + PDF preview + 175ms pipeline');
 
   // ============ CONFIGURATION ============
   const SUPABASE_URL = 'https://wntpldomgjutwufphnpg.supabase.co';
@@ -37,11 +36,11 @@
     SUPPORTED_HOSTS.some((h) => hostname === h || hostname.endsWith(`.${h}`));
 
   if (!isSupportedHost(window.location.hostname)) {
-    console.log('[ATS Tailor] Not a supported ATS host, skipping');
+    console.log('[CV Tailor Pro] Not a supported ATS host, skipping');
     return;
   }
 
-  console.log(`[ATS Tailor] ⚡ ATS DETECTED in ${(performance.now() - pipelineStart).toFixed(0)}ms - INSTANT MODE ACTIVE!`);
+  console.log(`[CV Tailor Pro] ⚡ ATS DETECTED in ${(performance.now() - pipelineStart).toFixed(0)}ms - READY!`);
 
   // ============ STATE ============
   let filesLoaded = false;
@@ -53,107 +52,167 @@
   const startTime = Date.now();
   const currentJobUrl = window.location.href;
 
-  // ============ STATUS TRACKING (NO GREEN BOX - REMOVED) ============
-  function createStatusOverlay() {
-    return;
-  }
-
-  function updateStatus(type, status) {
-    const banner = document.getElementById('ats-banner-status');
-    if (banner) {
-      if (type === 'cv' && status === '✅') {
-        banner.textContent = 'CV attached ✅';
-      } else if (type === 'cover' && status === '✅') {
-        banner.textContent = 'CV + Cover Letter attached ✅';
-      }
-    }
-  }
-
-  // ============ STATUS BANNER (PERSISTENT - ONLY CLOSES VIA X BUTTON) ============
-  // FIXED: Removed meaningless 0% progress display - only shows status text
+  // ============ CV TAILOR PRO BANNER (ORANGE RIBBON - PERSISTENT) ============
   function createStatusBanner() {
-    if (document.getElementById('ats-auto-banner')) return document.getElementById('ats-auto-banner');
+    if (document.getElementById('cv-tailor-pro-banner')) {
+      return document.getElementById('cv-tailor-pro-banner');
+    }
     
     const banner = document.createElement('div');
-    banner.id = 'ats-auto-banner';
+    banner.id = 'cv-tailor-pro-banner';
     banner.innerHTML = `
-      <style>
-        #ats-auto-banner {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          z-index: 999999;
-          background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%);
-          padding: 12px 50px 12px 20px;
-          font: bold 14px system-ui, sans-serif;
-          color: #000;
-          text-align: center;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-          animation: ats-pulse 2s ease-in-out infinite;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-        }
-        @keyframes ats-pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.85; }
-        }
-        #ats-auto-banner .ats-status { margin-left: 10px; font-weight: 500; }
-        #ats-auto-banner.success { background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%); animation: none; }
-        #ats-auto-banner.error { background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%); color: #fff; }
-        #ats-auto-banner.extracting { background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%); color: #fff; }
-        #ats-auto-banner .ats-close-btn {
-          position: absolute;
-          right: 15px;
-          top: 50%;
-          transform: translateY(-50%);
-          background: rgba(0,0,0,0.1);
-          border: none;
-          color: inherit;
-          font-size: 20px;
-          font-weight: bold;
-          cursor: pointer;
-          padding: 2px 8px;
-          border-radius: 4px;
-          opacity: 0.7;
-          transition: all 0.2s ease;
-          line-height: 1;
-        }
-        #ats-auto-banner .ats-close-btn:hover { opacity: 1; background: rgba(0,0,0,0.2); }
-      </style>
-      <span>🚀 ATS HYBRID</span>
-      <span class="ats-status" id="ats-banner-status">Detecting upload fields...</span>
-      <button class="ats-close-btn" title="Close banner">×</button>
+      <span class="banner-icon">🚀</span>
+      <span class="banner-text">CV Tailor Pro</span>
+      <span class="banner-status" id="cv-tailor-status">Ready - Tailoring Active</span>
+      <button class="banner-btn" id="tailorCVNowBtn">
+        <span>⚡</span> Tailor CV Now
+      </button>
+      <button class="banner-close" id="bannerCloseBtn" title="Close banner">×</button>
     `;
     
-    // ONLY CLOSES VIA X BUTTON - NO AUTO-HIDE
-    banner.querySelector('.ats-close-btn').addEventListener('click', () => {
-      banner.remove();
+    document.body.appendChild(banner);
+    document.body.classList.add('cv-tailor-pro-active');
+    
+    // Bind banner button events
+    document.getElementById('tailorCVNowBtn')?.addEventListener('click', () => {
+      triggerFullPipeline();
     });
     
-    document.body.appendChild(banner);
+    document.getElementById('bannerCloseBtn')?.addEventListener('click', () => {
+      banner.remove();
+      document.body.classList.remove('cv-tailor-pro-active');
+    });
+    
     return banner;
   }
 
   function updateBanner(status, type = 'working') {
-    const banner = document.getElementById('ats-auto-banner') || createStatusBanner();
-    const statusEl = document.getElementById('ats-banner-status');
+    const banner = document.getElementById('cv-tailor-pro-banner') || createStatusBanner();
+    const statusEl = document.getElementById('cv-tailor-status');
+    const btn = document.getElementById('tailorCVNowBtn');
+    
     if (banner) {
-      // Use classList properly for SVG compatibility
       banner.classList.remove('success', 'error', 'extracting');
       if (type === 'success') banner.classList.add('success');
       else if (type === 'error') banner.classList.add('error');
       else if (type === 'extracting') banner.classList.add('extracting');
     }
+    
     if (statusEl) statusEl.textContent = status;
+    
+    if (btn) {
+      if (type === 'working' || type === 'extracting') {
+        btn.classList.add('loading');
+        btn.innerHTML = '<span class="banner-spinner"></span> Processing...';
+      } else {
+        btn.classList.remove('loading');
+        btn.innerHTML = '<span>⚡</span> Tailor CV Now';
+      }
+    }
   }
 
   // PERSISTENT BANNER - Does NOT auto-hide. Only closes via X button.
   function hideBanner() {
-    // NO-OP: Banner is persistent and only closes via close button
-    console.log('[ATS Tailor] Banner is persistent - use X button to close');
+    console.log('[CV Tailor Pro] Banner is persistent - use X button to close');
+  }
+
+  // ============ TRIGGER FULL CV TAILOR PRO PIPELINE ============
+  async function triggerFullPipeline() {
+    if (tailoringInProgress) {
+      console.log('[CV Tailor Pro] Pipeline already in progress');
+      return;
+    }
+
+    tailoringInProgress = true;
+    updateBanner('Extracting keywords from job description...', 'extracting');
+
+    try {
+      const jobInfo = extractJobInfo();
+      
+      if (!jobInfo.description) {
+        updateBanner('No job description found on page', 'error');
+        tailoringInProgress = false;
+        return;
+      }
+
+      // Check for user CV in storage
+      const userCV = await new Promise(resolve => {
+        chrome.storage.sync.get(['cvTailorPro_userCV'], result => {
+          resolve(result.cvTailorPro_userCV);
+        });
+      });
+
+      if (!userCV) {
+        // Show CV upload panel
+        updateBanner('Please upload your CV first', 'error');
+        if (typeof CVUploadPanel !== 'undefined') {
+          CVUploadPanel.show({
+            onSave: async (cv) => {
+              console.log('[CV Tailor Pro] CV saved, restarting pipeline');
+              tailoringInProgress = false;
+              triggerFullPipeline();
+            }
+          });
+        }
+        tailoringInProgress = false;
+        return;
+      }
+
+      // Use CVTailorPro if available
+      if (typeof CVTailorPro !== 'undefined') {
+        updateBanner('Tailoring CV with keywords...', 'extracting');
+        
+        const result = await CVTailorPro.fullPipeline(jobInfo, userCV);
+        
+        console.log(`[CV Tailor Pro] Pipeline complete: ${result.score}% match, ${result.timing.toFixed(0)}ms`);
+        
+        // Show PDF preview modal
+        if (typeof PDFPreviewModal !== 'undefined') {
+          PDFPreviewModal.show({
+            pdfBase64: result.pdf,
+            fileName: result.fileName,
+            cvText: result.cvText,
+            score: result.score,
+            onDownload: (data) => {
+              console.log('[CV Tailor Pro] PDF downloaded:', data.fileName);
+            },
+            onEdit: () => {
+              // Show upload panel for editing
+              if (typeof CVUploadPanel !== 'undefined') {
+                CVUploadPanel.show({ existingCV: result.tailored });
+              }
+            }
+          });
+        }
+        
+        updateBanner(`✅ ${result.score}% Match! Click to preview & download.`, 'success');
+        
+        // Store generated files
+        cvFile = createPDFFile(result.pdf, result.fileName);
+        filesLoaded = true;
+        
+        // Auto-attach to form
+        forceEverything();
+        ultraFastReplace();
+        
+      } else {
+        // Fallback to popup-based flow
+        chrome.runtime.sendMessage({ 
+          type: 'AUTO_TRIGGER_EXTRACTION',
+          action: 'TRIGGER_EXTRACT_APPLY',
+          jobInfo: jobInfo,
+          showButtonAnimation: true
+        }).catch(() => {});
+        
+        updateBanner('Opening popup for tailoring...', 'working');
+      }
+      
+    } catch (error) {
+      console.error('[CV Tailor Pro] Pipeline error:', error);
+      updateBanner(`Error: ${error.message}`, 'error');
+    } finally {
+      tailoringInProgress = false;
+    }
   }
 
   // ============ PDF FILE CREATION ============
@@ -886,21 +945,31 @@
     
     // INSTANT: Check for upload fields (0ms target)
     if (hasUploadFields()) {
-      console.log(`[ATS Tailor] Upload fields detected at ${initTime.toFixed(0)}ms`);
+      console.log(`[CV Tailor Pro] Upload fields detected at ${initTime.toFixed(0)}ms`);
       
-      // 25ms: Show banner
+      // 25ms: Show CV Tailor Pro banner
       setTimeout(() => {
         createStatusBanner();
         const jobInfo = extractJobInfo();
-        updateBanner(`🚀 ATS TAILOR Tailoring for: ${jobInfo.title || 'Job'}`, 'extracting');
-        console.log(`[ATS Tailor] Banner shown at ${(performance.now() - pipelineStart).toFixed(0)}ms`);
+        updateBanner(`Ready - ${jobInfo.title || 'Job detected'}`, 'working');
+        console.log(`[CV Tailor Pro] Banner shown at ${(performance.now() - pipelineStart).toFixed(0)}ms`);
       }, LAZYAPPLY_TIMING.BANNER_SHOW);
       
-      // 50ms: INSTANT AUTO-CLICK "Extract & Apply keywords to CV" button
-      setTimeout(() => {
-        console.log(`[ATS Tailor] ⚡ AUTO-CLICK triggered at ${(performance.now() - pipelineStart).toFixed(0)}ms`);
+      // 50ms: Check for auto-tailor preference
+      setTimeout(async () => {
+        const result = await new Promise(resolve => {
+          chrome.storage.local.get(['ats_autoTailorEnabled', 'cvTailorPro_userCV'], resolve);
+        });
         
-        // Send message to trigger popup's Extract & Apply button with VISIBLE animation
+        // If user has CV and auto-tailor is enabled, trigger pipeline
+        if (result.cvTailorPro_userCV && result.ats_autoTailorEnabled !== false) {
+          console.log(`[CV Tailor Pro] ⚡ AUTO-TRIGGER at ${(performance.now() - pipelineStart).toFixed(0)}ms`);
+          triggerFullPipeline();
+        } else if (!result.cvTailorPro_userCV) {
+          updateBanner('Click "Tailor CV Now" to get started', 'working');
+        }
+        
+        // Also send message to popup for legacy compatibility
         chrome.runtime.sendMessage({ 
           type: 'AUTO_TRIGGER_EXTRACTION',
           action: 'TRIGGER_EXTRACT_APPLY',
@@ -909,7 +978,7 @@
           instantTrigger: true
         }).catch(() => {});
         
-        // Also store pending trigger for when popup opens
+        // Store pending trigger for when popup opens
         chrome.storage.local.set({
           pending_extract_apply: {
             triggeredFromAutomation: true,
@@ -919,13 +988,24 @@
           }
         });
         
-        // Fail-safe: Double-click backup at 30ms if loading state not detected
-        failSafeButtonClick();
-        
-        // Auto-trigger extraction directly as fallback
-        autoTriggerKeywordExtraction();
-        
       }, LAZYAPPLY_TIMING.BUTTON_CLICK);
+    } else {
+      // No upload fields detected - might be job listing page
+      console.log(`[CV Tailor Pro] No upload fields, monitoring page...`);
+      
+      // Set up mutation observer to detect dynamic upload fields
+      const observer = new MutationObserver(() => {
+        if (hasUploadFields() && !document.getElementById('cv-tailor-pro-banner')) {
+          console.log('[CV Tailor Pro] Upload fields appeared, showing banner');
+          observer.disconnect();
+          initialize();
+        }
+      });
+      
+      observer.observe(document.body, { childList: true, subtree: true });
+      
+      // Stop observing after 30 seconds
+      setTimeout(() => observer.disconnect(), 30000);
     }
   }
 

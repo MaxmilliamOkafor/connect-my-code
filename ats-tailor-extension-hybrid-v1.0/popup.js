@@ -170,6 +170,9 @@ class ATSTailor {
     document.getElementById('attachBoth')?.addEventListener('click', () => this.attachBothDocuments());
     document.getElementById('copyContent')?.addEventListener('click', () => this.copyCurrentContent());
     
+    // NEW: CV Upload/Import Button (OpenResume style)
+    document.getElementById('uploadCVBtn')?.addEventListener('click', () => this.showCVUploadPanel());
+    
     // NEW: Text download buttons
     document.getElementById('downloadCvText')?.addEventListener('click', () => this.downloadTextVersion('cv'));
     document.getElementById('downloadCoverText')?.addEventListener('click', () => this.downloadTextVersion('cover'));
@@ -204,8 +207,9 @@ class ATSTailor {
     });
     document.getElementById('saveWorkdayCreds')?.addEventListener('click', () => this.saveWorkdayCredentials());
     
-    // Load Workday settings
+    // Load Workday settings and CV status
     this.loadWorkdaySettings();
+    this.loadCVStatus();
 
     // Preview tabs
     document.getElementById('previewCvTab')?.addEventListener('click', () => this.switchPreviewTab('cv'));
@@ -220,7 +224,7 @@ class ATSTailor {
     // Listen for runtime messages to trigger Extract & Apply Keywords button
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.action === 'TRIGGER_EXTRACT_APPLY' || message.action === 'POPUP_TRIGGER_EXTRACT_APPLY') {
-        console.log('[ATS Tailor Popup] Received trigger message:', message.action, 'with animation:', message.showButtonAnimation);
+        console.log('[CV Tailor Pro] Received trigger message:', message.action);
         this.triggerExtractApplyWithUI(message.jobInfo, message.showButtonAnimation !== false);
         sendResponse({ status: 'triggered' });
         return true;
@@ -229,6 +233,40 @@ class ATSTailor {
     
     // Check for pending automation trigger on popup open
     this.checkPendingAutomationTrigger();
+  }
+
+  // NEW: Show CV Upload Panel (OpenResume style)
+  showCVUploadPanel() {
+    if (typeof CVUploadPanel !== 'undefined') {
+      CVUploadPanel.show({
+        onSave: (cv) => {
+          this.showToast('CV saved successfully!', 'success');
+          this.loadCVStatus();
+        },
+        onCancel: () => {}
+      });
+    } else {
+      this.showToast('CV upload panel not available', 'error');
+    }
+  }
+
+  // NEW: Load and display CV status
+  async loadCVStatus() {
+    const result = await new Promise(resolve => {
+      chrome.storage.sync.get(['cvTailorPro_userCV'], resolve);
+    });
+    
+    const statusEl = document.getElementById('cvImportStatus');
+    if (!statusEl) return;
+    
+    if (result.cvTailorPro_userCV?.personal?.name) {
+      const cv = result.cvTailorPro_userCV;
+      statusEl.innerHTML = `<span class="status-success">✓ ${cv.personal.name}</span>`;
+      statusEl.classList.add('has-cv');
+    } else {
+      statusEl.innerHTML = '<span class="status-text">No CV uploaded yet</span>';
+      statusEl.classList.remove('has-cv');
+    }
   }
   
   // NEW: Download text version of CV/Cover Letter
