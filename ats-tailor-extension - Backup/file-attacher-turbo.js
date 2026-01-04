@@ -1,13 +1,13 @@
-// file-attacher-turbo.js - ULTRA-FAST: LazyApply Max Speed (≤7ms)
-// 80% FASTER: 33ms → 7ms for 35ms total pipeline
+// file-attacher-turbo.js - INSTANT: LazyApply 100ms Target (≤3ms)
+// 100ms TARGET: Maximum speed for instant automation
 // CRITICAL: Uses 4.0's proven "X click → CV field → New CV attach" logic
 
 (function() {
   'use strict';
 
   const FileAttacher = {
-    // ============ TIMING TARGET (LAZYAPPLY MAX SPEED - 80% FASTER) ============
-    TIMING_TARGET: 7, // Target 7ms (was 33ms) for 35ms total pipeline
+    // ============ TIMING TARGET (LAZYAPPLY INSTANT - 100ms TOTAL) ============
+    TIMING_TARGET: 3, // Target 3ms for 20ms attach pipeline
 
     // ============ PIPELINE STATE ============
     pipelineState: {
@@ -295,17 +295,16 @@
       // GREENHOUSE FIX: Click "Attach" button first to reveal file input
       this.clickGreenhouseCoverAttach();
       
-      // ULTRA-FAST: Reduced wait from 20ms to 4ms
-      await new Promise(r => setTimeout(r, 4));
+      // INSTANT: No wait needed - synchronous execution
       
       // Try file attachment
       if (file) {
         let result = await this.attachToFirstMatch(file, 'cover');
         
-        // If no cover field found, try clicking Attach again and retry (ultra-fast delay)
+        // If no cover field found, try clicking Attach again and retry (instant)
         if (!result) {
           this.clickGreenhouseCoverAttach();
-          await new Promise(r => setTimeout(r, 8)); // 80% faster: 40ms → 8ms
+          await new Promise(r => setTimeout(r, 2)); // Minimal 2ms
           result = await this.attachToFirstMatch(file, 'cover');
         }
         
@@ -417,7 +416,7 @@
     // ============ ULTRA-FAST ATTACH PIPELINE (≤33ms - LAZYAPPLY 3X) ============
     async turboAttach(cvPdf, coverPdf, cvFilename, coverFilename, coverText = null) {
       const startTime = performance.now();
-      console.log('[FileAttacher] ⚡ Starting ULTRA-FAST attach (target: 33ms)');
+      console.log('[FileAttacher] ⚡ Starting INSTANT attach (target: 3ms)');
 
       // Create files SYNCHRONOUSLY (no await needed)
       const cvFile = cvPdf ? this.createPDFFile(cvPdf, cvFilename || 'Tailored_CV.pdf') : null;
@@ -427,8 +426,7 @@
       this.revealHiddenInputs();
       this.killXButtons();
       
-      // STEP 3: Ultra-fast wait - 5ms (was 25ms) - 80% faster
-      await new Promise(r => setTimeout(r, 5));
+      // INSTANT: No wait - proceed immediately
 
       // STEP 4-5: Attach CV + Click Cover Attach in parallel
       let cvAttached = false;
@@ -437,22 +435,21 @@
       }
       this.clickGreenhouseCoverAttach(); // No await - fire and forget
 
-      // STEP 6: Attach Cover Letter with ultra-fast delay
+      // STEP 6: Attach Cover Letter immediately
       let coverAttached = false;
       if (coverFile || coverText) {
-        await new Promise(r => setTimeout(r, 3)); // 80% faster: 15ms → 3ms
         coverAttached = await this.attachToCoverField(coverFile, coverText);
       }
       
-      // STEP 7: Quick retry for cover letter if needed - ultra-fast delay
+      // STEP 7: Quick retry for cover letter if needed - minimal delay
       if (!coverAttached && (coverFile || coverText)) {
         this.clickGreenhouseCoverAttach();
-        await new Promise(r => setTimeout(r, 8)); // 80% faster: 40ms → 8ms
+        await new Promise(r => setTimeout(r, 2)); // Minimal 2ms
         coverAttached = await this.attachToCoverField(coverFile, coverText);
       }
 
       const timing = performance.now() - startTime;
-      console.log(`[FileAttacher] ⚡ MAX-SPEED complete in ${timing.toFixed(0)}ms (target: ${this.TIMING_TARGET}ms)`);
+      console.log(`[FileAttacher] ⚡ INSTANT complete in ${timing.toFixed(0)}ms (target: ${this.TIMING_TARGET}ms)`);
       console.log(`[FileAttacher] Results: CV=${cvAttached ? '✅' : '❌'}, Cover=${coverAttached ? '✅' : '❌'}`);
 
       return {
