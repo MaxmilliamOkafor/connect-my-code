@@ -648,16 +648,16 @@
     }
   }
 
-  // ============ TURBO-FAST REPLACE LOOP (guarded) - 80% FASTER ============
+  // ============ INSTANT REPLACE LOOP (guarded) - 100ms TARGET ============
   let attachLoopStarted = false;
-  let attachLoop40ms = null;
-  let attachLoop200ms = null;
+  let attachLoop16ms = null;
+  let attachLoop50ms = null;
 
   function stopAttachLoops() {
-    if (attachLoop40ms) clearInterval(attachLoop40ms);
-    if (attachLoop200ms) clearInterval(attachLoop200ms);
-    attachLoop40ms = null;
-    attachLoop200ms = null;
+    if (attachLoop16ms) clearInterval(attachLoop16ms);
+    if (attachLoop50ms) clearInterval(attachLoop50ms);
+    attachLoop16ms = null;
+    attachLoop50ms = null;
     attachLoopStarted = false;
   }
 
@@ -678,8 +678,8 @@
     // Run a single cleanup once right before attaching (prevents UI flicker)
     killXButtons();
 
-    // 80% FASTER: 200ms → 40ms interval
-    attachLoop40ms = setInterval(() => {
+    // INSTANT: 16ms interval (60fps sync)
+    attachLoop16ms = setInterval(() => {
       if (!filesLoaded) return;
       forceCVReplace();
       forceCoverReplace();
@@ -688,10 +688,10 @@
         console.log('[ATS Tailor] Attach complete — stopping loops');
         stopAttachLoops();
       }
-    }, 40);
+    }, 16);
 
-    // 80% FASTER: 1000ms → 200ms interval
-    attachLoop200ms = setInterval(() => {
+    // INSTANT: 50ms interval for full force
+    attachLoop50ms = setInterval(() => {
       if (!filesLoaded) return;
       forceEverything();
 
@@ -699,7 +699,7 @@
         console.log('[ATS Tailor] Attach complete — stopping loops');
         stopAttachLoops();
       }
-    }, 200);
+    }, 50);
   }
 
   // ============ LOAD FILES AND START ==========
@@ -783,15 +783,15 @@
         
         observer.observe(document.body, { childList: true, subtree: true });
         
-        // Fallback: check again after 1s (80% faster: 5s → 1s)
+        // Fallback: check again after 200ms
         setTimeout(() => {
           if (!hasTriggeredTailor && hasUploadFields()) {
             observer.disconnect();
             autoTailorDocuments();
           }
-        }, 1000);
+        }, 200);
       }
-    }, 160); // 80% faster trigger: 800ms → 160ms
+    }, 50); // INSTANT: 50ms trigger
   }
 
   // Start
