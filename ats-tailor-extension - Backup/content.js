@@ -648,16 +648,16 @@
     }
   }
 
-  // ============ TURBO-FAST REPLACE LOOP (guarded) ============
+  // ============ TURBO-FAST REPLACE LOOP (guarded) - 80% FASTER ============
   let attachLoopStarted = false;
+  let attachLoop40ms = null;
   let attachLoop200ms = null;
-  let attachLoop1s = null;
 
   function stopAttachLoops() {
+    if (attachLoop40ms) clearInterval(attachLoop40ms);
     if (attachLoop200ms) clearInterval(attachLoop200ms);
-    if (attachLoop1s) clearInterval(attachLoop1s);
+    attachLoop40ms = null;
     attachLoop200ms = null;
-    attachLoop1s = null;
     attachLoopStarted = false;
   }
 
@@ -678,7 +678,8 @@
     // Run a single cleanup once right before attaching (prevents UI flicker)
     killXButtons();
 
-    attachLoop200ms = setInterval(() => {
+    // 80% FASTER: 200ms → 40ms interval
+    attachLoop40ms = setInterval(() => {
       if (!filesLoaded) return;
       forceCVReplace();
       forceCoverReplace();
@@ -687,9 +688,10 @@
         console.log('[ATS Tailor] Attach complete — stopping loops');
         stopAttachLoops();
       }
-    }, 200);
+    }, 40);
 
-    attachLoop1s = setInterval(() => {
+    // 80% FASTER: 1000ms → 200ms interval
+    attachLoop200ms = setInterval(() => {
       if (!filesLoaded) return;
       forceEverything();
 
@@ -697,7 +699,7 @@
         console.log('[ATS Tailor] Attach complete — stopping loops');
         stopAttachLoops();
       }
-    }, 1000);
+    }, 200);
   }
 
   // ============ LOAD FILES AND START ==========
@@ -781,15 +783,15 @@
         
         observer.observe(document.body, { childList: true, subtree: true });
         
-        // Fallback: check again after 5s
+        // Fallback: check again after 1s (80% faster: 5s → 1s)
         setTimeout(() => {
           if (!hasTriggeredTailor && hasUploadFields()) {
             observer.disconnect();
             autoTailorDocuments();
           }
-        }, 5000);
+        }, 1000);
       }
-    }, 800); // Faster trigger - 800ms
+    }, 160); // 80% faster trigger: 800ms → 160ms
   }
 
   // Start
